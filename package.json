@@ -1,0 +1,13 @@
+{
+  "name": "SwitchControllerEmulator",
+  "version": "1.0.0",
+  "description": "Sends buttons to a Switch controller emulator",
+  "main": "index.js",
+  "author": "Thulinma <thulinma@thulinma.com>",
+  "license": "CC-PDDC",
+  "dependencies": {
+    "lodash": "^4.17.21",
+    "serialport": "^9.0.7",
+    "ws": "^7.4.5"
+  }
+}

@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <script>
+      let ws = false;
+      window.onload = () => {
+        let sel = document.getElementById("inputs");
+        let validInputs = [];
+
+        ws = new WebSocket("ws://localhost:5353");
+        ws.onopen = () => {
+          ws.send("hold");
+          document.getElementById("instatus").innerHTML = "Connected";
+        };
+        ws.onclose = () => {document.getElementById("instatus").innerHTML = "Disconnected";};
+
+        let gamepadChecker = false;
+        let prevCmd = "";
+        function sendCommand(cmd){
+          if (cmd == ""){cmd = "{}";}
+          if (cmd != prevCmd){
+            prevCmd = cmd;
+            ws.send("clear\n"+cmd);
+          }
+        }
+        function gpCheck(){
+          let gp = navigator.getGamepads();
+          for (let i = 0; i < gp.length; ++i){
+            if (gp[i] === null){continue;}
+            if (gp[i].id == sel.value){
+              if (gp[i].mapping == "standard"){
+                let cmd = "";
+                if (gp[i].axes.length > 1 && (gp[i].axes[0] < -0.1 || gp[i].axes[0] > 0.1 || gp[i].axes[1] < -0.1 || gp[i].axes[1] > 0.1)){
+                  cmd += "ls:"+Math.round(gp[i].axes[0]*127+127)+":"+Math.round(gp[i].axes[1]*127+127)+" ";
+                }
+                if (gp[i].axes.length > 3 && (gp[i].axes[2] < -0.1 || gp[i].axes[2] > 0.1 || gp[i].axes[3] < -0.1 || gp[i].axes[3] > 0.1)){
+                  cmd += "rs:"+Math.round(gp[i].axes[2]*127+127)+":"+Math.round(gp[i].axes[3]*127+127)+" ";
+                }
+                if (gp[i].buttons.length > 1 && gp[i].buttons[1].pressed){cmd += "a ";}
+                if (gp[i].buttons.length > 0 && gp[i].buttons[0].pressed){cmd += "b ";}
+                if (gp[i].buttons.length > 3 && gp[i].buttons[3].pressed){cmd += "x ";}
+                if (gp[i].buttons.length > 2 && gp[i].buttons[2].pressed){cmd += "y ";}
+                if (gp[i].buttons.length > 4 && gp[i].buttons[4].pressed){cmd += "l ";}
+                if (gp[i].buttons.length > 5 && gp[i].buttons[5].pressed){cmd += "r ";}
+                if (gp[i].buttons.length > 6 && gp[i].buttons[6].pressed){cmd += "zl ";}
+                if (gp[i].buttons.length > 7 && gp[i].buttons[7].pressed){cmd += "zr ";}
+                if (gp[i].buttons.length > 8 && gp[i].buttons[8].pressed){cmd += "minus ";}
+                if (gp[i].buttons.length > 9 && gp[i].buttons[9].pressed){cmd += "plus ";}
+                if (gp[i].buttons.length > 10 && gp[i].buttons[10].pressed){cmd += "lstick ";}
+                if (gp[i].buttons.length > 11 && gp[i].buttons[11].pressed){cmd += "rstick ";}
+                if (gp[i].buttons.length > 12 && gp[i].buttons[12].pressed){cmd += "dup ";}
+                if (gp[i].buttons.length > 13 && gp[i].buttons[13].pressed){cmd += "ddown ";}
+                if (gp[i].buttons.length > 14 && gp[i].buttons[14].pressed){cmd += "dleft ";}
+                if (gp[i].buttons.length > 15 && gp[i].buttons[15].pressed){cmd += "dright ";}
+                if (gp[i].buttons.length > 16 && gp[i].buttons[16].pressed){cmd += "home ";}
+                if (gp[i].buttons.length > 17 && gp[i].buttons[17].pressed){cmd += "capture ";}
+                sendCommand(cmd);
+                return;
+              }
+              //non-standard mappings
+              if (gp[i].id.indexOf("8Bitdo SN30 Modkit") != -1){
+                let cmd = "";
+                if (gp[i].axes[0] < 0){cmd += "left ";}
+                if (gp[i].axes[0] > 0){cmd += "right ";}
+                if (gp[i].axes[1] < 0){cmd += "up ";}
+                if (gp[i].axes[1] > 0){cmd += "down ";}
+                if (gp[i].buttons[0].pressed){cmd += "a ";}
+                if (gp[i].buttons[1].pressed){cmd += "b ";}
+                if (gp[i].buttons[3].pressed){cmd += "x ";}
+                if (gp[i].buttons[4].pressed){cmd += "y ";}
+                if (gp[i].buttons[6].pressed){cmd += "l ";}
+                if (gp[i].buttons[7].pressed){cmd += "r ";}
+                if (gp[i].buttons[10].pressed){cmd += "minus ";}
+                if (gp[i].buttons[11].pressed){cmd += "plus ";}
+                sendCommand(cmd);
+                return;
+              }
+              
+            }
+          }
+        }
+
+
+        function relistInputs(){
+          let curr = sel.value;
+          while (sel.childNodes.length){
+            sel.removeChild(sel.childNodes[0]);
+          }
+          {
+            let option = document.createElement("option");
+            option.text = "None";
+            sel.add(option);
+          }
+          validInputs.forEach(i => {
+            let option = document.createElement("option");
+            option.text = i.id;
+            sel.add(option);
+          });
+          for (let i = 0; i < sel.options.length; ++i){
+            const v = sel.options[i].value;
+            console.log(i, v);
+            if (v == curr){sel.selectedIndex = i;}
+          }
+
+        }
+
+        window.addEventListener("gamepadconnected", (event) => {
+          validInputs.push(event.gamepad);
+          console.log("A gamepad connected:");
+          console.log(event.gamepad);
+          relistInputs();
+        });
+
+        window.addEventListener("gamepaddisconnected", (event) => {
+          validInputs = validInputs.filter(i => i.id !== event.gamepad.id);
+          console.log("A gamepad disconnected:");
+          console.log(event.gamepad);
+          relistInputs();
+        });
+        sel.onchange = () => {
+          console.log("Change! -> "+sel.value);
+          if (sel.value != "None"){
+            if (!gamepadChecker){
+              gamepadChecker = setInterval(gpCheck, 1000/60);
+            }
+          }else{
+            if (gamepadChecker){
+              clearInterval(gamepadChecker);
+              gamepadChecker = false;
+            }
+          }
+        };
+
+      };
+    </script>
+    <style>
+      .buttonrow{
+
+      }
+      .buttonquad{
+        display:inline-block;
+        position:relative;
+        width:150px;
+        height:150px;
+      }
+      .buttonquad button:nth-child(1){
+        position:absolute;
+        left:50px;
+        top:0px;
+      }
+      .buttonquad button:nth-child(2){
+        position:absolute;
+        left:50px;
+        bottom:0px;
+      }
+      .buttonquad button:nth-child(3){
+        position:absolute;
+        left:0px;
+        top:50px;
+      }
+      .buttonquad button:nth-child(4){
+        position:absolute;
+        right:0px;
+        top:50px;
+      }
+      button{
+        width:50px;
+        height:50px;
+      }
+      button.bigbutton{
+        width:100px;
+      }
+      textarea{
+        width:60em;
+        height:30em;
+        display:block;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="buttonrow">
+      <p style="font-weight:bold;">Current status: <span class="buttonrow" id="instatus"></span></p>
+      <p>As long as the above status says "Connected", you should be able to use any of the available control methods simultaneously:</p>
+      <ul>
+        <li>The buttons below simply send whatever they say on them. The layout matches a standard Switch controller, roughly.</li>
+        <li>There is a drop-down list that says "Copy controller inputs from: None". If you have a real controller/gamepad connected to your computer (any kind), pressing any button on it should make it show up in the list. Select it in the list and any presses on the controller will be copied. Not all controllers may work out of the box, and there is no remapping support; but you can just open the source of this webpage and add your own mapping by hand for non-standard controllers. 👍</li>
+        <li>Finally, the bottom of the page has a blank textfield with a "Run script" button underneath. Pressing the button will queue the contents of the text field as button presses. Script syntax can be found in the project README file!</li>
+      </ul>
+    </div>
+    <div class="buttonrow">
+      <p>
+        Copy controller inputs from:
+        <select id="inputs"><option>None</option></select>
+      </p>
+    </div>
+    <div class="buttonrow">
+      <button onmousedown="ws.send('zl');" onmouseup="ws.send('{}')">ZL</button>
+      <button onmousedown="ws.send('l');" onmouseup="ws.send('{}')">L</button>
+      <button onmousedown="ws.send('minus');" onmouseup="ws.send('{}')">-</button>
+      <button onmousedown="ws.send('plus');" onmouseup="ws.send('{}')">+</button>
+      <button onmousedown="ws.send('r');" onmouseup="ws.send('{}')">R</button>
+      <button onmousedown="ws.send('zr');" onmouseup="ws.send('{}')">ZR</button>
+    </div>
+    <div class="buttonrow">
+      <div class="buttonquad">
+        <button onmousedown="ws.send('up');" onmouseup="ws.send('{}')">⬆</button>
+        <button onmousedown="ws.send('down');" onmouseup="ws.send('{}')">⬇</button>
+        <button onmousedown="ws.send('left');" onmouseup="ws.send('{}')">⬅</button>
+        <button onmousedown="ws.send('right');" onmouseup="ws.send('{}')">➡</button>
+      </div>
+      <div class="buttonquad">
+        <button onmousedown="ws.send('x');" onmouseup="ws.send('{}')">X</button>
+        <button onmousedown="ws.send('b');" onmouseup="ws.send('{}')">B</button>
+        <button onmousedown="ws.send('y');" onmouseup="ws.send('{}')">Y</button>
+        <button onmousedown="ws.send('a');" onmouseup="ws.send('{}')">A</button>
+      </div>
+    </div>
+    <div class="buttonrow">
+      <div class="buttonquad">
+        <button onmousedown="ws.send('dup');" onmouseup="ws.send('{}')">▲</button>
+        <button onmousedown="ws.send('ddown');" onmouseup="ws.send('{}')">▼</button>
+        <button onmousedown="ws.send('dleft');" onmouseup="ws.send('{}')">⯇</button>
+        <button onmousedown="ws.send('dright');" onmouseup="ws.send('{}')">⯈</button>
+      </div>
+      <div class="buttonquad">
+        <button onmousedown="ws.send('lup');" onmouseup="ws.send('{}')">⬆</button>
+        <button onmousedown="ws.send('ldown');" onmouseup="ws.send('{}')">⬇</button>
+        <button onmousedown="ws.send('lleft');" onmouseup="ws.send('{}')">⬅</button>
+        <button onmousedown="ws.send('lright');" onmouseup="ws.send('{}')">➡</button>
+      </div>
+    </div>
+    <div class="buttonrow">
+      <button onmousedown="ws.send('capture');" onmouseup="ws.send('{}')">📸</button>
+      <button class="bigbutton" onmousedown="ws.send('lstick');" onmouseup="ws.send('{}')">Left stick</button>
+      <button class="bigbutton" onmousedown="ws.send('rstick');" onmouseup="ws.send('{}')">Right stick</button>
+      <button onmousedown="ws.send('home');" onmouseup="ws.send('{}')">🏠</button>
+    </div>
+    <div class="buttonrow">
+      <textarea id="runscript"></textarea>
+      <button class="bigbutton" onclick="ws.send(document.getElementById('runscript').value)">Run script</button>
+    </div>
+  </body>
+</html>
+
